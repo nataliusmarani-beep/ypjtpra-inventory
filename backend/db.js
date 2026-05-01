@@ -74,7 +74,17 @@ const needsMigration = userSchema && (
   !userSchema.sql.includes("'Principal'")
 );
 if (needsMigration) {
+  // On a fresh DB the original users table has no telegram_chat_id yet —
+  // add it now so the migration INSERT can SELECT it without crashing.
+  const preMigCols = db.prepare(`PRAGMA table_info(users)`).all().map(c => c.name);
+  if (!preMigCols.includes('telegram_chat_id')) {
+    db.exec(`ALTER TABLE users ADD COLUMN telegram_chat_id TEXT`);
+  }
+
   db.exec(`PRAGMA foreign_keys = OFF`);
+  // Drop any leftover users_new from a previous crashed migration attempt
+  // so Railway crash-loop restarts don't hit "table users_new already exists".
+  db.exec(`DROP TABLE IF EXISTS users_new`);
   db.exec(`
     CREATE TABLE users_new (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
