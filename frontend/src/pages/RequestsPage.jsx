@@ -65,7 +65,7 @@ export default function RequestsPage({ role, user, showToast, refreshPending }) 
   const storeLocation = (() => {
     if (isAdmin) return undefined;                          // admins see everything
     if (!user || user.unit_school === 'All') return undefined; // All → both stores
-    return user.unit_school === 'PAUD' ? 'PAUD YPJ KK' : 'SD SMP YPJ KK'; // PAUD → PAUD store; SD/SMP → SD SMP store
+    return user.unit_school === 'PAUD' ? 'PAUD YPJ TPRA' : 'SD SMP YPJ TPRA'; // PAUD → PAUD store; SD/SMP → SD SMP store
   })();
 
   useEffect(() => { loadHistory(); }, [loadHistory]);

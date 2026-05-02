@@ -10,8 +10,8 @@ const CAT_BY_STORE = {
 // Derive locked location + allowed unit_school options for a Storekeeper
 function storekeepLock(user) {
   if (!user || user.role !== 'Storekeeper' || user.unit_school === 'All') return null;
-  if (user.unit_school === 'PAUD') return { location: 'PAUD YPJ KK',    unitSchools: ['PAUD'] };
-  return                                   { location: 'SD SMP YPJ KK', unitSchools: ['SD', 'SMP'] };
+  if (user.unit_school === 'PAUD') return { location: 'PAUD YPJ TPRA',    unitSchools: ['PAUD'] };
+  return                                   { location: 'SD SMP YPJ TPRA', unitSchools: ['SD', 'SMP'] };
 }
 
 export default function ItemForm({ initial, meta, user, onSubmit, onClose }) {
@@ -20,7 +20,7 @@ export default function ItemForm({ initial, meta, user, onSubmit, onClose }) {
   const [form, setForm] = useState(() => {
     const base = initial ?? {
       name:'', code:'', icon:'', category:'Stationery', store_category:'Supplies',
-      location:'SD SMP YPJ KK', unit_school:'All',
+      location:'SD SMP YPJ TPRA', unit_school:'All',
       quantity:0, unit_name:'pcs', description:'', min_threshold:10, condition:'Good',
     };
     // Pre-fill locked fields when adding a new item

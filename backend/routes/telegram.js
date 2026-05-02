@@ -16,10 +16,10 @@ router.post('/webhook', async (req, res) => {
 
     if (text === '/start' || text?.startsWith('/start')) {
       await sendTelegram(chatId,
-        `👋 <b>Welcome to YPJ KK Inventory Bot!</b>\n\n` +
+        `👋 <b>Welcome to YPJ TPRA Inventory Bot!</b>\n\n` +
         `Your Telegram Chat ID is:\n<code>${chatId}</code>\n\n` +
         `📋 Copy that number and paste it in your profile on the inventory app to receive notifications.\n\n` +
-        `<i>Go to: kkinventory.ypj.sch.id → click your name → My Profile → Telegram Chat ID</i>`
+        `<i>Go to: tprainventory.ypj.sch.id → click your name → My Profile → Telegram Chat ID</i>`
       );
     }
   } catch (e) {

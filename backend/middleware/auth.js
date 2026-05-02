@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const SECRET = process.env.JWT_SECRET || 'ypjkk-inventory-2025-secret-key';
+const SECRET = process.env.JWT_SECRET || 'ypjtpra-inventory-2025-secret-key';
 
 module.exports = function requireAuth(req, res, next) {
   // Prefer HttpOnly cookie; fall back to Authorization header for API clients

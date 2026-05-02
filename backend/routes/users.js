@@ -214,7 +214,7 @@ router.post('/import', async (req, res) => {
 
     const validRoles = ['Manager','Storekeeper','Principal','Teacher','Other'];
     const validUnits = ['All','PAUD','SD','SMP'];
-    const validLocs  = ['','PAUD YPJ KK','SD SMP YPJ KK'];
+    const validLocs  = ['','PAUD YPJ TPRA','SD SMP YPJ TPRA'];
     const validCats  = ['','Supplies','Teacher Resources','Sport & Uniform'];
 
     let imported = 0, skipped = 0;

@@ -32,7 +32,7 @@ export default function DashboardPage({ role, user, showToast }) {
     if (isAdmin) return undefined;
     if (user?.location) return user.location;
     if (!user || user.unit_school === 'All') return undefined;
-    return user.unit_school === 'PAUD' ? 'PAUD YPJ KK' : 'SD SMP YPJ KK';
+    return user.unit_school === 'PAUD' ? 'PAUD YPJ TPRA' : 'SD SMP YPJ TPRA';
   })();
 
   useEffect(() => {

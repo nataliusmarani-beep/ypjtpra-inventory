@@ -262,7 +262,7 @@ router.post('/cart', (req, res) => {
         `🔔 <b>New Request Pending Approval</b>\n\n` +
         `From: <b>${requester_name.trim()}</b> (${unit_school})\n${itemsSummary}\n\n` +
         `Type: ${type === 'borrow' ? 'Borrow' : 'Used-up'}${purpose ? `\nPurpose: ${purpose}` : ''}\n\n` +
-        `👉 Open the app to review: kkinventory.ypj.sch.id/approvals`
+        `👉 Open the app to review: tprainventory.ypj.sch.id/approvals`
       ).catch(() => {});
     }
   } catch (err) {
@@ -320,7 +320,7 @@ router.post('/', (req, res) => {
       `🔔 <b>New Request Pending Approval</b>\n\n` +
       `From: <b>${requester_name.trim()}</b> (${unit_school})\n• ${row.item_name} × ${quantity} ${row.unit_name}\n\n` +
       `Type: ${type === 'borrow' ? 'Borrow' : 'Used-up'}${purpose ? `\nPurpose: ${purpose}` : ''}\n\n` +
-      `👉 Open the app to review: kkinventory.ypj.sch.id/approvals`
+      `👉 Open the app to review: tprainventory.ypj.sch.id/approvals`
     ).catch(() => {});
   }
 });
@@ -473,7 +473,7 @@ router.put('/groups/:groupId/forward', (req, res) => {
     `Forwarded by: <b>${req.user?.name || 'Storekeeper'}</b>\n` +
     `From: ${first.requester_name}\n\n${itemsBullet}` +
     `${forwarded_note ? `\n\n📝 Note: ${forwarded_note}` : ''}\n\n` +
-    `👉 Open app to review: kkinventory.ypj.sch.id/approvals`
+    `👉 Open app to review: tprainventory.ypj.sch.id/approvals`
   ).catch(() => {});
 });
 

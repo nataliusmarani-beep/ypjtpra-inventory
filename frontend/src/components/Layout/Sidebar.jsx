@@ -1,8 +1,8 @@
 import { NavLink } from 'react-router-dom';
 
 const STORES = [
-  { label: 'PAUD YPJ KK',   unit: 'PAUD' },
-  { label: 'SD SMP YPJ KK', unit: 'SD'   },  // SD and SMP both map here
+  { label: 'PAUD YPJ TPRA',   unit: 'PAUD' },
+  { label: 'SD SMP YPJ TPRA', unit: 'SD'   },  // SD and SMP both map here
 ];
 
 export default function Sidebar({ role, user, pendingCount }) {
@@ -13,7 +13,7 @@ export default function Sidebar({ role, user, pendingCount }) {
     if (isAdmin) return STORES; // both
     if (!user || user.unit_school === 'All') return STORES;
     if (user.unit_school === 'PAUD') return [STORES[0]];
-    return [STORES[1]]; // SD or SMP → SD SMP YPJ KK
+    return [STORES[1]]; // SD or SMP → SD SMP YPJ TPRA
   })();
 
   return (

@@ -13,15 +13,15 @@ const CAT_BY_STORE = {
 const EMPTY = {
   name: '', code: '', icon: '',
   category: 'Stationery', store_category: 'Supplies',
-  location: 'SD SMP YPJ KK', unit_school: 'All',
+  location: 'SD SMP YPJ TPRA', unit_school: 'All',
   quantity: 0, max_quantity: 0, unit_name: 'pcs',
   min_threshold: 10, condition: 'Good', po_number: '', description: '',
 };
 
 function storekeepLock(user) {
   if (!user || user.role !== 'Storekeeper' || user.unit_school === 'All') return null;
-  if (user.unit_school === 'PAUD') return { location: 'PAUD YPJ KK',    unitSchools: ['PAUD'] };
-  return                                   { location: 'SD SMP YPJ KK', unitSchools: ['SD', 'SMP'] };
+  if (user.unit_school === 'PAUD') return { location: 'PAUD YPJ TPRA',    unitSchools: ['PAUD'] };
+  return                                   { location: 'SD SMP YPJ TPRA', unitSchools: ['SD', 'SMP'] };
 }
 
 export default function AddItemPage({ showToast, user }) {
@@ -72,7 +72,7 @@ export default function AddItemPage({ showToast, user }) {
           icon:           item.icon           || '',
           category:       item.category       || 'Stationery',
           store_category: item.store_category || 'Supplies',
-          location:       item.location       || 'SD SMP YPJ KK',
+          location:       item.location       || 'SD SMP YPJ TPRA',
           unit_school:    item.unit_school    || 'All',
           quantity:       item.quantity       ?? 0,
           max_quantity:   item.max_quantity   ?? 0,
@@ -265,7 +265,7 @@ export default function AddItemPage({ showToast, user }) {
                 style={{ width: '100%', opacity: lock ? 0.75 : 1, cursor: lock ? 'not-allowed' : 'pointer' }}
                 disabled={!!lock}
               >
-                {(M.LOCATIONS || ['SD SMP YPJ KK']).map(l => <option key={l}>{l}</option>)}
+                {(M.LOCATIONS || ['SD SMP YPJ TPRA']).map(l => <option key={l}>{l}</option>)}
               </select>
               {lock && <div style={{ fontSize:11, color:'var(--muted)', marginTop:3 }}>🔒 Assigned store location</div>}
             </div>

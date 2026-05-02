@@ -37,14 +37,14 @@ export default function InventoryPage({ role, user, showToast }) {
     if (role === 'Manager') return true;
     if (role !== 'Storekeeper') return false;
     if (!user || user.unit_school === 'All') return true; // Storekeeper assigned to All → full access
-    const myLocation = user.unit_school === 'PAUD' ? 'PAUD YPJ KK' : 'SD SMP YPJ KK';
+    const myLocation = user.unit_school === 'PAUD' ? 'PAUD YPJ TPRA' : 'SD SMP YPJ TPRA';
     return item.location === myLocation;
   };
   const importRef = useRef();
   const [importing, setImporting] = useState(false);
 
   const ITEM_HEADERS = ['name','code','category','store_category','location','unit_school','quantity','max_quantity','unit_name','min_threshold','condition','description'];
-  const ITEM_SAMPLE  = { name:'Spidol Whiteboard', code:'STN-001', category:'Stationery', store_category:'Supplies', location:'SD SMP YPJ KK', unit_school:'All', quantity:'20', max_quantity:'50', unit_name:'pcs', min_threshold:'5', condition:'Good', description:'Optional note' };
+  const ITEM_SAMPLE  = { name:'Spidol Whiteboard', code:'STN-001', category:'Stationery', store_category:'Supplies', location:'SD SMP YPJ TPRA', unit_school:'All', quantity:'20', max_quantity:'50', unit_name:'pcs', min_threshold:'5', condition:'Good', description:'Optional note' };
 
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
@@ -70,7 +70,7 @@ export default function InventoryPage({ role, user, showToast }) {
     if (isAdmin) return undefined;
     if (user?.location) return user.location;
     if (!user || user.unit_school === 'All') return undefined;
-    return user.unit_school === 'PAUD' ? 'PAUD YPJ KK' : 'SD SMP YPJ KK';
+    return user.unit_school === 'PAUD' ? 'PAUD YPJ TPRA' : 'SD SMP YPJ TPRA';
   })();
 
   useEffect(() => { api.getMeta().then(setMeta).catch(() => {}); }, []);

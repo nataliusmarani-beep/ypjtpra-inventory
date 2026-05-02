@@ -1,9 +1,9 @@
-// YPJ KK Inventory — Service Worker
+// YPJ TPRA Inventory — Service Worker
 // Strategy:
 //   /api/*        → Network-first (always fresh data; fall back to nothing)
 //   everything else → Cache-first (shell, icons, JS bundles)
 
-const CACHE = 'ypj-inv-v5';
+const CACHE = 'ypj-tpra-v1';
 
 const PRECACHE = [
   '/',

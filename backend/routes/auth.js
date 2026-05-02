@@ -5,7 +5,7 @@ const db      = require('../db');
 const requireAuth = require('../middleware/auth');
 
 const router = express.Router();
-const SECRET = process.env.JWT_SECRET || 'ypjkk-inventory-2025-secret-key';
+const SECRET = process.env.JWT_SECRET || 'ypjtpra-inventory-2025-secret-key';
 const IS_PROD = process.env.NODE_ENV === 'production';
 
 const COOKIE_OPTS = {

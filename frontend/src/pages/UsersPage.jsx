@@ -6,7 +6,7 @@ import { parseCSV, downloadTemplate } from '../utils/download.js';
 
 const ROLES       = ['Manager','Storekeeper','Principal','Teacher','Other'];
 const UNIT_SCHOOLS = ['All','PAUD','SD','SMP'];
-const LOCATIONS   = ['','PAUD YPJ KK','SD SMP YPJ KK'];
+const LOCATIONS   = ['','PAUD YPJ TPRA','SD SMP YPJ TPRA'];
 const STORE_CATS  = ['','Supplies','Teacher Resources','Sport & Uniform'];
 
 const ROLE_COLOR = {
@@ -29,7 +29,7 @@ export default function UsersPage({ user: currentUser, showToast }) {
   const [importing, setImporting] = useState(false);
 
   const USER_HEADERS = ['name','email','role','unit_school','location','store_category','password'];
-  const USER_SAMPLE  = { name:'Budi Santoso', email:'budi@ypj.sch.id', role:'Teacher', unit_school:'SD', location:'SD SMP YPJ KK', store_category:'', password:'YPJ2025' };
+  const USER_SAMPLE  = { name:'Budi Santoso', email:'budi@ypj.sch.id', role:'Teacher', unit_school:'SD', location:'SD SMP YPJ TPRA', store_category:'', password:'YPJ2025' };
 
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
@@ -365,8 +365,8 @@ function UserFormFields({ form, set, setForm, isAdd, isSelf }) {
           <label className="form-label">Store Location</label>
           <select value={form.location} onChange={set('location')}>
             <option value="">Both (All Stores)</option>
-            <option value="PAUD YPJ KK">PAUD YPJ KK</option>
-            <option value="SD SMP YPJ KK">SD SMP YPJ KK</option>
+            <option value="PAUD YPJ TPRA">PAUD YPJ TPRA</option>
+            <option value="SD SMP YPJ TPRA">SD SMP YPJ TPRA</option>
           </select>
           <div style={{ fontSize:11, color:'var(--muted)', marginTop:3 }}>
             Controls which store items this user can see and request.

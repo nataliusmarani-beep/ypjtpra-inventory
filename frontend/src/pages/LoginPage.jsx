@@ -29,7 +29,7 @@ export default function LoginPage({ onLogin }) {
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
           <div style={{ fontSize: 40, marginBottom: 8 }}>📦</div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--navy)' }}>YPJ KK Inventory</div>
+          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--navy)' }}>YPJ TPRA Inventory</div>
           <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>Campus Management System</div>
         </div>
 

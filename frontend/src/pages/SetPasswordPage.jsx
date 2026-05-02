@@ -50,7 +50,7 @@ export default function SetPasswordPage({ showToast }) {
         {/* Header */}
         <div style={{ background: 'var(--navy)', padding: '20px 28px' }}>
           <div style={{ color: 'white', fontWeight: 800, fontSize: 18, marginBottom: 2 }}>
-            📦 YPJ KK Inventory
+            📦 YPJ TPRA Inventory
           </div>
           <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>
             Campus Management System

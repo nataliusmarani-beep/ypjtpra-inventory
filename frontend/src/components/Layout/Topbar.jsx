@@ -109,7 +109,7 @@ export default function Topbar({ user, pendingCount, onLogout, onProfileUpdate }
               <div style={{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:8, padding:'12px 16px', fontSize:13, color:'#1e40af', marginBottom:20 }}>
                 <strong>How to connect Telegram:</strong>
                 <ol style={{ margin:'8px 0 0 16px', padding:0, lineHeight:1.8 }}>
-                  <li>Open Telegram and search for <strong>@ypjkkinventory_bot</strong></li>
+                  <li>Open Telegram and search for <strong>@ypjtprainventory_bot</strong></li>
                   <li>Tap <strong>Start</strong> or send <code>/start</code></li>
                   <li>The bot will reply with your Chat ID — copy it</li>
                   <li>Paste it in the field above and click Save</li>
