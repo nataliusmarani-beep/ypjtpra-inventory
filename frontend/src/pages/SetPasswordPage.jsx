@@ -2,6 +2,32 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
 
+function Card({ children }) {
+  return (
+    <div style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'var(--bg)', padding: 20,
+    }}>
+      <div style={{
+        background: 'white', borderRadius: 14, width: '100%', maxWidth: 460,
+        boxShadow: '0 4px 32px rgba(0,0,0,0.10)', overflow: 'hidden',
+      }}>
+        <div style={{ background: 'var(--navy)', padding: '20px 28px' }}>
+          <div style={{ color: 'white', fontWeight: 800, fontSize: 18, marginBottom: 2 }}>
+            📦 YPJ TPRA Inventory
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>
+            Campus Management System
+          </div>
+        </div>
+        <div style={{ padding: '28px 28px 32px' }}>
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SetPasswordPage({ showToast }) {
   const [params]   = useSearchParams();
   const navigate   = useNavigate();
@@ -37,32 +63,6 @@ export default function SetPasswordPage({ showToast }) {
     }
   };
 
-  // ── Shared card wrapper ────────────────────────────────────────────────────
-  const Card = ({ children }) => (
-    <div style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'var(--bg)', padding: 20,
-    }}>
-      <div style={{
-        background: 'white', borderRadius: 14, width: '100%', maxWidth: 460,
-        boxShadow: '0 4px 32px rgba(0,0,0,0.10)', overflow: 'hidden',
-      }}>
-        {/* Header */}
-        <div style={{ background: 'var(--navy)', padding: '20px 28px' }}>
-          <div style={{ color: 'white', fontWeight: 800, fontSize: 18, marginBottom: 2 }}>
-            📦 YPJ TPRA Inventory
-          </div>
-          <div style={{ color: 'rgba(255,255,255,0.65)', fontSize: 13 }}>
-            Campus Management System
-          </div>
-        </div>
-        <div style={{ padding: '28px 28px 32px' }}>
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-
   // ── Loading ────────────────────────────────────────────────────────────────
   if (status === 'loading') {
     return (
@@ -85,7 +85,7 @@ export default function SetPasswordPage({ showToast }) {
             This invitation link has expired or already been used.<br />
             Please ask your Manager to resend the invitation from the Users page.
           </p>
-          <button className="btn btn-primary" onClick={() => navigate('/login')}>
+          <button className="btn btn-primary" onClick={() => navigate('/', { replace: true })}>
             Go to Login
           </button>
         </div>
@@ -103,7 +103,7 @@ export default function SetPasswordPage({ showToast }) {
           <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.7, marginBottom: 24 }}>
             Your account is now active. You can log in with your email and the password you just created.
           </p>
-          <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => navigate('/')}>
+          <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => navigate('/', { replace: true })}>
             🔐 Go to Login
           </button>
         </div>

@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../api.js';
 import Modal from '../components/shared/Modal.jsx';
 import ConfirmDialog from '../components/shared/ConfirmDialog.jsx';
 import ItemForm from '../components/Inventory/ItemForm.jsx';
 import { parseCSV, downloadTemplate } from '../utils/download.js';
+import CategoryBadge from '../components/shared/CategoryBadge.jsx';
 
 const CAT_EMOJI = {
   'Stationery':'📝','Housekeeping':'🧹','Learning Tools':'📚','Groceries':'🛒',
@@ -21,11 +22,14 @@ function stockColor(qty, threshold) {
 
 export default function InventoryPage({ role, user, showToast }) {
   const navigate = useNavigate();
+  const routerLocation = useLocation();
+  const initialStatus = new URLSearchParams(routerLocation.search).get('status') || '';
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
   const [location, setLocation] = useState('');
+  const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [storeTab, setStoreTab] = useState('All');
   const [modal, setModal] = useState(null);
   const [meta, setMeta] = useState(null);
@@ -65,11 +69,11 @@ export default function InventoryPage({ role, user, showToast }) {
     setImporting(false);
   };
 
-  // Use explicit location set by admin; fallback to unit_school mapping
+  // unit_school 'All' always means no location filter, even if user.location is set
   const storeLocation = (() => {
     if (isAdmin) return undefined;
-    if (user?.location) return user.location;
     if (!user || user.unit_school === 'All') return undefined;
+    if (user.location) return user.location;
     return user.unit_school === 'PAUD' ? 'PAUD YPJ TPRA' : 'SD SMP YPJ TPRA';
   })();
 
@@ -80,12 +84,12 @@ export default function InventoryPage({ role, user, showToast }) {
     api.getItems({
       search:         search || undefined,
       category:       category || undefined,
-      // Teachers: locked to their store; Admins: use the dropdown selection
+      status:         statusFilter || undefined,
       location:       storeLocation ?? (location || undefined),
       store_category: storeTab !== 'All' ? storeTab : undefined,
     }).then(d => { setItems(d); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [search, category, location, storeTab, storeLocation]);
+  }, [search, category, statusFilter, location, storeTab, storeLocation]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -145,6 +149,12 @@ export default function InventoryPage({ role, user, showToast }) {
           <option value="">All Categories</option>
           {(meta?.CATEGORIES || []).map(c => <option key={c}>{c}</option>)}
         </select>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+          <option value="">All Status</option>
+          <option value="low_stock">⚠️ Low Stock</option>
+          <option value="out_of_stock">🔴 Out of Stock</option>
+          <option value="ok">✅ OK</option>
+        </select>
         {/* Location dropdown only for Admin/Storekeeper; Teachers are locked to their store */}
         {isAdmin && (
           <select value={location} onChange={e => setLocation(e.target.value)}>
@@ -186,7 +196,7 @@ export default function InventoryPage({ role, user, showToast }) {
                             </div>
                           </div>
                         </td>
-                        <td><span className="badge badge-blue">{item.category}</span></td>
+                        <td><CategoryBadge category={item.category} /></td>
                         <td><span style={{ fontSize: 12, fontWeight: 700 }}>📍 {item.location}</span></td>
                         <td><span className={`badge ${item.unit_school === 'All' ? 'badge-grey' : 'badge-teal'}`}>{item.unit_school}</span></td>
                         <td>
@@ -197,13 +207,14 @@ export default function InventoryPage({ role, user, showToast }) {
                             <span className={low ? (item.quantity === 0 ? 'qty-low' : 'qty-warn') : 'qty-ok'}>
                               {item.quantity} {item.unit_name}
                             </span>
-                            {low && <span className="badge badge-red" style={{ fontSize: 10 }}>LOW</span>}
+                            {low && <span className="badge badge-red" style={{ fontSize: 10 }}>{item.quantity === 0 ? 'Out of Stock' : 'Low Stock'}</span>}
                           </div>
                         </td>
                         <td>
-                          <span className={`badge ${item.condition === 'Good' ? 'badge-green' : item.condition === 'Fair' ? 'badge-orange' : 'badge-red'}`}>
-                            {item.condition}
-                          </span>
+                          {item.quantity === 0
+                            ? <span style={{ fontSize: 12, color: 'var(--muted)' }}>N/A</span>
+                            : <span className={`badge ${item.condition === 'Good' ? 'badge-green' : item.condition === 'Fair' ? 'badge-orange' : 'badge-red'}`}>{item.condition}</span>
+                          }
                         </td>
                         {isAdmin && (
                           <td>

@@ -27,24 +27,29 @@ export default function DashboardPage({ role, user, showToast }) {
 
   const isAdmin = role === 'Manager' || role === 'Storekeeper';
 
-  // Use explicit location set by admin; fallback to unit_school mapping
+  // unit_school 'All' always means no location filter, even if user.location is set
   const storeLocation = (() => {
     if (isAdmin) return undefined;
-    if (user?.location) return user.location;
     if (!user || user.unit_school === 'All') return undefined;
+    if (user.location) return user.location;
     return user.unit_school === 'PAUD' ? 'PAUD YPJ TPRA' : 'SD SMP YPJ TPRA';
   })();
 
   useEffect(() => {
+    if (!user) return;
     api.getStats().then(setStats).catch(() => {});
-    api.getItems({ status: 'low_stock', location: storeLocation })
-      .then(d => setLowItems(d.slice(0, 10))).catch(() => {});
-    const reqFilter = !isAdmin ? { requester_email: user?.email } : {};
+    Promise.all([
+      api.getItems({ status: 'low_stock',    location: storeLocation }),
+      api.getItems({ status: 'out_of_stock', location: storeLocation }),
+    ]).then(([low, out]) => {
+      setLowItems([...out, ...low].slice(0, 10));
+    }).catch(() => {});
+    const reqFilter = !isAdmin ? { requester_email: user.email } : {};
     api.getRequests(reqFilter).then(d => {
       setRecent(d.slice(0, 10));
       if (!isAdmin) setMyPending(d.filter(r => r.status === 'pending').length);
     }).catch(() => {});
-  }, []);
+  }, [user]);
 
   const now = new Date();
   const hour = now.getHours();
@@ -87,7 +92,7 @@ export default function DashboardPage({ role, user, showToast }) {
         )}
         <div className="stat-card" onClick={() => navigate('/inventory?status=low_stock')}>
           <div className="stat-icon">🔴</div>
-          <div className="stat-label">Low Stock Items</div>
+          <div className="stat-label">Low &amp; Out of Stock</div>
           <div className="stat-value" style={{ color: 'var(--red)' }}>{stats.lowStock}</div>
           <div className="stat-meta">Need restocking soon</div>
         </div>
@@ -101,29 +106,32 @@ export default function DashboardPage({ role, user, showToast }) {
 
       {stats.lowStock > 0 && (
         <div className="alert alert-warning" onClick={() => navigate('/inventory?status=low_stock')} style={{ cursor: 'pointer' }}>
-          ⚠️ {stats.lowStock} item(s) are running low on stock. <strong>View low stock items →</strong>
+          ⚠️ {stats.lowStock} item(s) are low or out of stock. <strong>View items →</strong>
         </div>
       )}
 
       <div className="two-col">
         <div className="card">
           <div className="card-title" style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <span>🔴 Low Stock Alert</span>
+            <span>🔴 Low &amp; Out of Stock Alert</span>
             {lowItems.length > 0 && (
-              <span onClick={() => navigate('/inventory')} style={{ fontSize:12, fontWeight:600, color:'var(--blue)', cursor:'pointer' }}>View all →</span>
+              <span onClick={() => navigate('/inventory?status=low_stock')} style={{ fontSize:12, fontWeight:600, color:'var(--blue)', cursor:'pointer' }}>View all →</span>
             )}
           </div>
           {lowItems.length === 0
             ? <p style={{ color: 'var(--muted)', fontSize: 13 }}>All items are sufficiently stocked. ✅</p>
             : <table>
-                <thead><tr><th>Item</th><th>Location</th><th>Qty</th></tr></thead>
+                <thead><tr><th>Item</th><th>Location</th><th>Qty</th><th>Condition</th></tr></thead>
                 <tbody>
                   {lowItems.map(item => (
                     <tr key={item.id} className="low-stock-row">
                       <td><strong>{item.name}</strong></td>
                       <td>{item.location}</td>
                       <td className={item.quantity === 0 ? 'qty-low' : 'qty-warn'}>
-                        {item.quantity} {item.unit_name}
+                        {item.quantity === 0 ? <span className="badge badge-red" style={{fontSize:10}}>Out of Stock</span> : `${item.quantity} ${item.unit_name}`}
+                      </td>
+                      <td style={{fontSize:12, color:'var(--muted)'}}>
+                        {item.quantity === 0 ? 'N/A' : item.condition}
                       </td>
                     </tr>
                   ))}
