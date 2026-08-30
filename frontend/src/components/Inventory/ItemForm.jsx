@@ -19,8 +19,8 @@ export default function ItemForm({ initial, meta, user, onSubmit, onClose }) {
 
   const [form, setForm] = useState(() => {
     const base = initial ?? {
-      name:'', code:'', icon:'', category:'Stationery', store_category:'Supplies',
-      location:'SD SMP YPJ TPRA', unit_school:'All',
+      name:'', code:'', barcode:'', subtitle:'', icon:'', category:'Stationery', store_category:'Supplies',
+      location:'SD SMP YPJ TPRA', unit_school:'All', item_type:'used-up',
       quantity:0, unit_name:'pcs', description:'', min_threshold:10, condition:'Good',
     };
     // Pre-fill locked fields when adding a new item
@@ -61,7 +61,20 @@ export default function ItemForm({ initial, meta, user, onSubmit, onClose }) {
         </div>
         <div className="form-group full">
           <label className="form-label">Item Name <span className="req">*</span></label>
-          <input type="text" value={form.name} onChange={set('name')} required />
+          <input type="text" value={form.name} onChange={set('name')} maxLength={25} required />
+          <div style={{ fontSize:10, color:'var(--muted)', marginTop:3, textAlign:'right' }}>{form.name.length}/25</div>
+        </div>
+        <div className="form-group full">
+          <label className="form-label">Subtitle</label>
+          <input
+            type="text"
+            value={form.subtitle || ''}
+            onChange={set('subtitle')}
+            placeholder="e.g. Size M, Blue"
+          />
+          <div style={{ fontSize:10, color:'var(--muted)', marginTop:3 }}>
+            Shown next to the barcode number, separated by "|" — use it for size, color, etc.
+          </div>
         </div>
         <div className="form-group">
           <label className="form-label">Store Category <span className="req">*</span></label>
@@ -73,6 +86,13 @@ export default function ItemForm({ initial, meta, user, onSubmit, onClose }) {
           <label className="form-label">Category <span className="req">*</span></label>
           <select className="filter-select" style={{ width:'100%' }} value={form.category} onChange={set('category')}>
             {(CAT_BY_STORE[form.store_category] || M.CATEGORIES || []).map(c => <option key={c}>{c}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Type <span className="req">*</span></label>
+          <select className="filter-select" style={{ width:'100%' }} value={form.item_type} onChange={set('item_type')} required>
+            <option value="used-up">🗑️ Used-up (consumable)</option>
+            <option value="borrow">↩️ Borrow (must be returned)</option>
           </select>
         </div>
         <div className="form-group">
@@ -123,6 +143,15 @@ export default function ItemForm({ initial, meta, user, onSubmit, onClose }) {
             onChange={set('po_number')}
             placeholder="e.g. PO-2026-001 or PR-2026-042"
             required
+          />
+        </div>
+        <div className="form-group full">
+          <label className="form-label">Barcode Number</label>
+          <input
+            type="text"
+            value={form.barcode || ''}
+            onChange={set('barcode')}
+            placeholder="Scan or type the item's barcode number"
           />
         </div>
         <div className="form-group full">

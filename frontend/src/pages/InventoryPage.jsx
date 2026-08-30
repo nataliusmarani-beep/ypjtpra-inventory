@@ -36,19 +36,26 @@ export default function InventoryPage({ role, user, showToast }) {
 
   const isAdmin = role === 'Manager' || role === 'Storekeeper';
 
-  // Returns true if the current user is allowed to edit/delete a given item
+  // Returns true if the current user is allowed to edit/delete a given item.
+  // Mirrors the backend restriction in routes/items.js: confined to the
+  // storekeeper's assigned location/category when those fields are set.
   const canEdit = (item) => {
     if (role === 'Manager') return true;
     if (role !== 'Storekeeper') return false;
-    if (!user || user.unit_school === 'All') return true; // Storekeeper assigned to All → full access
-    const myLocation = user.unit_school === 'PAUD' ? 'PAUD YPJ TPRA' : 'SD SMP YPJ TPRA';
-    return item.location === myLocation;
+    if (!user) return false;
+    const myLocation = user.location
+      || (user.unit_school === 'PAUD' ? 'PAUD YPJ TPRA'
+        : (user.unit_school === 'SD' || user.unit_school === 'SMP') ? 'SD SMP YPJ TPRA'
+        : null);
+    if (myLocation && item.location !== myLocation) return false;
+    if (user.store_category && item.store_category !== user.store_category) return false;
+    return true;
   };
   const importRef = useRef();
   const [importing, setImporting] = useState(false);
 
-  const ITEM_HEADERS = ['name','code','category','store_category','location','unit_school','quantity','max_quantity','unit_name','min_threshold','condition','description'];
-  const ITEM_SAMPLE  = { name:'Spidol Whiteboard', code:'STN-001', category:'Stationery', store_category:'Supplies', location:'SD SMP YPJ TPRA', unit_school:'All', quantity:'20', max_quantity:'50', unit_name:'pcs', min_threshold:'5', condition:'Good', description:'Optional note' };
+  const ITEM_HEADERS = ['name','code','barcode','subtitle','category','store_category','item_type','location','unit_school','quantity','max_quantity','unit_name','min_threshold','condition','description'];
+  const ITEM_SAMPLE  = { name:'Spidol Whiteboard', code:'STN-001', barcode:'8991234567890', subtitle:'Blue', category:'Stationery', store_category:'Supplies', item_type:'used-up', location:'SD SMP YPJ TPRA', unit_school:'All', quantity:'20', max_quantity:'50', unit_name:'pcs', min_threshold:'5', condition:'Good', description:'Optional note' };
 
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
@@ -69,11 +76,11 @@ export default function InventoryPage({ role, user, showToast }) {
     setImporting(false);
   };
 
-  // unit_school 'All' always means no location filter, even if user.location is set
+  // Use explicit location set by admin; fallback to unit_school mapping
   const storeLocation = (() => {
     if (isAdmin) return undefined;
+    if (user?.location) return user.location;
     if (!user || user.unit_school === 'All') return undefined;
-    if (user.location) return user.location;
     return user.unit_school === 'PAUD' ? 'PAUD YPJ TPRA' : 'SD SMP YPJ TPRA';
   })();
 
@@ -121,7 +128,7 @@ export default function InventoryPage({ role, user, showToast }) {
           </div>
         </div>
         {isAdmin && (
-          <div style={{ display:'flex', gap:8 }}>
+          <div className="page-actions">
             <button className="btn btn-secondary" onClick={() => downloadTemplate(ITEM_HEADERS, ITEM_SAMPLE, 'items-template.csv')}>⬇ Template</button>
             <button className="btn btn-secondary" onClick={() => importRef.current.click()} disabled={importing}>
               {importing ? 'Importing...' : '📂 Import CSV'}
@@ -143,7 +150,7 @@ export default function InventoryPage({ role, user, showToast }) {
       <div className="filter-bar">
         <div className="search-box">
           <span className="search-icon">🔍</span>
-          <input type="text" placeholder="Search items or code..." value={search} onChange={e => setSearch(e.target.value)} />
+          <input type="text" placeholder="Search items, code, or barcode..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <select value={category} onChange={e => setCategory(e.target.value)}>
           <option value="">All Categories</option>
@@ -164,14 +171,14 @@ export default function InventoryPage({ role, user, showToast }) {
         )}
       </div>
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="card inventory-card-wrap" style={{ padding: 0, overflow: 'hidden' }}>
         {loading ? <p className="loading">Loading...</p> : items.length === 0
           ? <p className="empty-state">No items found.</p>
           : <div className="table-wrap">
-              <table>
+              <table className="responsive-table inventory-table">
                 <thead>
                   <tr>
-                    <th>Item</th><th>Category</th><th>Location</th>
+                    <th>Item</th><th>Category</th><th>Type</th><th>Location</th>
                     <th>Unit</th><th>Stock</th><th>Condition</th>
                     {isAdmin && <th>Actions</th>}
                   </tr>
@@ -181,25 +188,55 @@ export default function InventoryPage({ role, user, showToast }) {
                     const pct = stockPct(item.quantity, item.max_quantity || item.quantity + 1);
                     const col = stockColor(item.quantity, item.min_threshold);
                     const low = item.quantity <= item.min_threshold;
+                    const stockStatus = item.quantity === 0 ? 'out' : low ? 'low' : 'ok';
                     return (
-                      <tr key={item.id} style={low ? { background: '#fff7ed' } : {}}>
+                      <tr key={item.id} data-stock={stockStatus}>
                         <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <div className="item-thumb">
-                              {(item.icon || '').startsWith('data:')
-                                ? <img src={item.icon} alt="" style={{ width:32, height:32, objectFit:'contain', borderRadius:4 }} />
-                                : (item.icon || CAT_EMOJI[item.category] || '📦')}
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                              <div className="item-thumb">
+                                {(item.icon || '').startsWith('data:')
+                                  ? <img src={item.icon} alt="" style={{ width:32, height:32, objectFit:'contain', borderRadius:4 }} />
+                                  : (item.icon || CAT_EMOJI[item.category] || '📦')}
+                              </div>
+                              <div style={{ minWidth: 0 }}>
+                                {isAdmin && canEdit(item) ? (
+                                  <div
+                                    role="button"
+                                    tabIndex={0}
+                                    onClick={() => setModal({ type: 'edit', data: item })}
+                                    onKeyDown={e => { if (e.key === 'Enter') setModal({ type: 'edit', data: item }); }}
+                                    style={{ fontWeight: 700, color: 'var(--primary)', cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}
+                                    title="Edit item details & description"
+                                  >
+                                    {item.name}
+                                  </div>
+                                ) : (
+                                  <div style={{ fontWeight: 700 }}>{item.name}</div>
+                                )}
+                                {[item.barcode || item.code, item.subtitle].filter(Boolean).length > 0 && (
+                                  <div className="mono" style={{ color: 'var(--muted)' }}>
+                                    {[item.barcode || item.code, item.subtitle].filter(Boolean).join(' | ')}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            <div>
-                              <div style={{ fontWeight: 700 }}>{item.name}</div>
-                              {item.code && <div className="mono" style={{ color: 'var(--muted)' }}>{item.code}</div>}
-                            </div>
+                            {stockStatus !== 'ok' && (
+                              <span className="badge badge-red" style={{ flexShrink: 0 }}>
+                                {stockStatus === 'out' ? '🔴 Out' : '⚠️ Low'}
+                              </span>
+                            )}
                           </div>
                         </td>
-                        <td><CategoryBadge category={item.category} /></td>
-                        <td><span style={{ fontSize: 12, fontWeight: 700 }}>📍 {item.location}</span></td>
-                        <td><span className={`badge ${item.unit_school === 'All' ? 'badge-grey' : 'badge-teal'}`}>{item.unit_school}</span></td>
-                        <td>
+                        <td data-th="Category"><CategoryBadge category={item.category} /></td>
+                        <td data-th="Type">
+                          <span className={`badge ${item.item_type === 'borrow' ? 'badge-purple' : 'badge-grey'}`}>
+                            {item.item_type === 'borrow' ? '↩️ Borrow' : '🗑️ Used-up'}
+                          </span>
+                        </td>
+                        <td data-th="Location"><span style={{ fontSize: 12, fontWeight: 700 }}>📍 {item.location}</span></td>
+                        <td data-th="Unit"><span className={`badge ${item.unit_school === 'All' ? 'badge-grey' : 'badge-teal'}`}>{item.unit_school}</span></td>
+                        <td data-th="Stock">
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <span className="stock-bar">
                               <span className="stock-fill" style={{ width: `${pct}%`, background: col }}></span>
@@ -207,10 +244,9 @@ export default function InventoryPage({ role, user, showToast }) {
                             <span className={low ? (item.quantity === 0 ? 'qty-low' : 'qty-warn') : 'qty-ok'}>
                               {item.quantity} {item.unit_name}
                             </span>
-                            {low && <span className="badge badge-red" style={{ fontSize: 10 }}>{item.quantity === 0 ? 'Out of Stock' : 'Low Stock'}</span>}
                           </div>
                         </td>
-                        <td>
+                        <td data-th="Condition">
                           {item.quantity === 0
                             ? <span style={{ fontSize: 12, color: 'var(--muted)' }}>N/A</span>
                             : <span className={`badge ${item.condition === 'Good' ? 'badge-green' : item.condition === 'Fair' ? 'badge-orange' : 'badge-red'}`}>{item.condition}</span>
@@ -221,11 +257,11 @@ export default function InventoryPage({ role, user, showToast }) {
                             <div className="td-actions">
                               {canEdit(item) ? (
                                 <>
-                                  <button className="btn btn-outline btn-sm" onClick={() => setModal({ type: 'edit', data: item })}>✏️</button>
-                                  <button className="btn btn-ghost btn-sm" onClick={() => setModal({ type: 'delete', data: item })}>🗑️</button>
+                                  <button className="btn btn-outline btn-sm" onClick={() => setModal({ type: 'edit', data: item })}>✏️ Edit</button>
+                                  <button className="btn btn-ghost btn-sm" onClick={() => setModal({ type: 'delete', data: item })}>🗑️ Delete</button>
                                 </>
                               ) : (
-                                <span style={{ fontSize: 11, color: 'var(--muted)' }} title="You can only edit items in your assigned store">🔒</span>
+                                <span style={{ fontSize: 11, color: 'var(--muted)' }} title="You can only edit items in your assigned store">🔒 Locked</span>
                               )}
                             </div>
                           </td>

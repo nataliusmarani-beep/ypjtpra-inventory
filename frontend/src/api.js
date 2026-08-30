@@ -3,9 +3,11 @@
 const BASE = import.meta.env.VITE_API_URL || '/api';
 
 async function request(path, options = {}) {
+  const isFormData = options.body instanceof FormData;
   const res = await fetch(`${BASE}${path}`, {
     credentials: 'include',           // sends the HttpOnly cookie automatically
-    headers: { 'Content-Type': 'application/json' },
+    // Let the browser set multipart/form-data + boundary itself for FormData bodies
+    headers: isFormData ? {} : { 'Content-Type': 'application/json' },
     ...options,
   });
 
@@ -47,7 +49,17 @@ export const api = {
   getGroups:      (p)      => request(`/requests/groups${qs(p)}`),
   getStats:       ()       => request('/requests/stats'),
   submitRequest:  (b)      => request('/requests',           { method: 'POST', body: JSON.stringify(b) }),
-  submitCart:     (b)      => request('/requests/cart',      { method: 'POST', body: JSON.stringify(b) }),
+  submitCart:     (b, file) => {
+    if (!file) return request('/requests/cart', { method: 'POST', body: JSON.stringify(b) });
+    const fd = new FormData();
+    Object.entries(b).forEach(([k, v]) => {
+      if (v == null) return;
+      fd.append(k, k === 'items' ? JSON.stringify(v) : v);
+    });
+    fd.append('attachment', file);
+    return request('/requests/cart', { method: 'POST', body: fd });
+  },
+  attachmentUrl:  (filename) => `${BASE}/requests/attachment/${encodeURIComponent(filename)}`,
   approveRequest: (id, b)  => request(`/requests/${id}/approve`,  { method: 'PUT', body: JSON.stringify(b || {}) }),
   rejectRequest:  (id, b)  => request(`/requests/${id}/reject`,   { method: 'PUT', body: JSON.stringify(b || {}) }),
   forwardRequest: (id, b)  => request(`/requests/${id}/forward`,  { method: 'PUT', body: JSON.stringify(b || {}) }),
@@ -55,6 +67,13 @@ export const api = {
   rejectGroup:    (gid, b) => request(`/requests/groups/${encodeURIComponent(gid)}/reject`,  { method: 'PUT', body: JSON.stringify(b || {}) }),
   forwardGroup:   (gid, b) => request(`/requests/groups/${encodeURIComponent(gid)}/forward`, { method: 'PUT', body: JSON.stringify(b || {}) }),
   returnRequest:  (id)     => request(`/requests/${id}/return`,   { method: 'PUT', body: JSON.stringify({}) }),
+  requestInfo:    (gid, b) => request(`/requests/groups/${encodeURIComponent(gid)}/request-info`, { method: 'PUT', body: JSON.stringify(b || {}) }),
+  completeInfo:   (gid, b, file) => {
+    const fd = new FormData();
+    if (b?.purpose) fd.append('purpose', b.purpose);
+    if (file) fd.append('attachment', file);
+    return request(`/requests/groups/${encodeURIComponent(gid)}/complete-info`, { method: 'PUT', body: fd });
+  },
 
   // Users (Manager only)
   getUsers:      (p)      => request(`/users${qs(p)}`),

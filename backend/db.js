@@ -68,23 +68,23 @@ db.exec(`
 
 // ── Migrate users table if CHECK constraint needs updating ────────────────
 // Handles: Admin→Manager rename AND adding Principal role
+// The rebuild below copies telegram_chat_id from the old table, so that
+// column must exist on `users` before we start (older DBs may predate it).
+const preMigrationUserCols = db.prepare(`PRAGMA table_info(users)`).all().map(c => c.name);
+if (!preMigrationUserCols.includes('telegram_chat_id')) {
+  db.exec(`ALTER TABLE users ADD COLUMN telegram_chat_id TEXT`);
+}
+
 const userSchema = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='users'`).get();
 const needsMigration = userSchema && (
   userSchema.sql.includes("'Admin'") ||
   !userSchema.sql.includes("'Principal'")
 );
 if (needsMigration) {
-  // On a fresh DB the original users table has no telegram_chat_id yet —
-  // add it now so the migration INSERT can SELECT it without crashing.
-  const preMigCols = db.prepare(`PRAGMA table_info(users)`).all().map(c => c.name);
-  if (!preMigCols.includes('telegram_chat_id')) {
-    db.exec(`ALTER TABLE users ADD COLUMN telegram_chat_id TEXT`);
-  }
-
   db.exec(`PRAGMA foreign_keys = OFF`);
-  // Drop any leftover users_new from a previous crashed migration attempt
-  // so Railway crash-loop restarts don't hit "table users_new already exists".
   db.exec(`DROP TABLE IF EXISTS users_new`);
+  db.exec(`BEGIN`);
+  try {
   db.exec(`
     CREATE TABLE users_new (
       id               INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -109,8 +109,14 @@ if (needsMigration) {
     DROP TABLE users;
     ALTER TABLE users_new RENAME TO users;
   `);
-  db.exec(`PRAGMA foreign_keys = ON`);
+  db.exec(`COMMIT`);
   console.log('[db] Migration: users table updated (Principal role added).');
+  } catch (err) {
+    db.exec(`ROLLBACK`);
+    throw err;
+  } finally {
+    db.exec(`PRAGMA foreign_keys = ON`);
+  }
 }
 
 // Migrations for existing databases
@@ -127,6 +133,10 @@ if (!reqCols.includes('forwarded_note'))  db.exec(`ALTER TABLE requests ADD COLU
 if (!reqCols.includes('approval_notes'))  db.exec(`ALTER TABLE requests ADD COLUMN approval_notes TEXT`);
 if (!reqCols.includes('reminder_2d_sent')) db.exec(`ALTER TABLE requests ADD COLUMN reminder_2d_sent INTEGER NOT NULL DEFAULT 0`);
 if (!reqCols.includes('reminder_1d_sent')) db.exec(`ALTER TABLE requests ADD COLUMN reminder_1d_sent INTEGER NOT NULL DEFAULT 0`);
+if (!reqCols.includes('attachment_path')) db.exec(`ALTER TABLE requests ADD COLUMN attachment_path TEXT`);
+if (!reqCols.includes('attachment_name')) db.exec(`ALTER TABLE requests ADD COLUMN attachment_name TEXT`);
+if (!reqCols.includes('needs_info'))        db.exec(`ALTER TABLE requests ADD COLUMN needs_info INTEGER NOT NULL DEFAULT 0`);
+if (!reqCols.includes('info_request_note')) db.exec(`ALTER TABLE requests ADD COLUMN info_request_note TEXT`);
 
 const itemCols = db.prepare(`PRAGMA table_info(items)`).all().map(c => c.name);
 const migrations = {
@@ -139,6 +149,9 @@ const migrations = {
   unit_name:      `ALTER TABLE items ADD COLUMN unit_name TEXT NOT NULL DEFAULT 'pcs'`,
   condition:      `ALTER TABLE items ADD COLUMN condition TEXT NOT NULL DEFAULT 'Good'`,
   po_number:      `ALTER TABLE items ADD COLUMN po_number TEXT`,
+  barcode:        `ALTER TABLE items ADD COLUMN barcode TEXT`,
+  item_type:      `ALTER TABLE items ADD COLUMN item_type TEXT NOT NULL DEFAULT 'used-up'`,
+  subtitle:       `ALTER TABLE items ADD COLUMN subtitle TEXT`,
 };
 for (const [col, sql] of Object.entries(migrations)) {
   if (!itemCols.includes(col)) db.exec(sql);
@@ -158,4 +171,5 @@ if (userCount === 0) {
   console.log('[db] First-run seed: Manager account created (nmarani@fmi.com).');
 }
 
+db.DATA_DIR = DB_DIR;
 module.exports = db;

@@ -1,7 +1,46 @@
 const express = require('express');
+const path    = require('path');
+const fs      = require('fs');
+const crypto  = require('crypto');
+const multer  = require('multer');
 const db = require('../db');
-const { sendNewRequestAlert, sendRequestSubmitted, sendRequestApproved, sendRequestRejected, sendLowStockAlert, sendRequestForwarded, sendPrincipalSubmissionNotice, sendPrincipalDecisionNotice } = require('../mailer');
+const { sendNewRequestAlert, sendRequestSubmitted, sendRequestApproved, sendRequestRejected, sendLowStockAlert, sendRequestForwarded, sendInfoRequested, sendRequestInfoProvided, sendPrincipalSubmissionNotice, sendPrincipalDecisionNotice } = require('../mailer');
 const { sendTelegram, sendTelegramToMany } = require('../telegram');
+
+// ── Attachment uploads (email/PDF/image proof for a request) ───────────────
+// Stored on the same persistent volume as the SQLite DB (backend/ locally, /data on Railway).
+const UPLOAD_DIR = path.join(db.DATA_DIR, 'uploads', 'requests');
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+const ATTACHMENT_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.pdf', '.eml', '.msg'];
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, UPLOAD_DIR),
+    filename: (req, file, cb) => {
+      const ext = path.extname(file.originalname).toLowerCase();
+      cb(null, `${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`);
+    },
+  }),
+  limits: { fileSize: 1 * 1024 * 1024 }, // 1 MB
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!ATTACHMENT_EXTENSIONS.includes(ext)) {
+      return cb(Object.assign(new Error('Attachment must be an image, PDF, or email file (.eml/.msg).'), { status: 400 }));
+    }
+    cb(null, true);
+  },
+});
+
+// Wraps upload.single() so a rejected/too-large file responds with a clear
+// message directly, instead of falling through to the generic error handler.
+function uploadAttachment(req, res, next) {
+  upload.single('attachment')(req, res, (err) => {
+    if (!err) return next();
+    if (err.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ error: 'Attachment must be under 1 MB.' });
+    res.status(err.status || 400).json({ error: err.message });
+  });
+}
 
 // Fetch active Manager + Storekeeper records
 function getStockAlertRecipients() {
@@ -156,6 +195,10 @@ router.get('/groups', (req, res) => {
         return_date:    row.return_date,
         created_at:     row.created_at,
         approved_at:    row.approved_at,
+        attachment_path: row.attachment_path || null,
+        attachment_name: row.attachment_name || null,
+        needs_info:        row.needs_info || 0,
+        info_request_note: row.info_request_note || null,
         items: [],
       });
     }
@@ -176,8 +219,13 @@ router.get('/groups', (req, res) => {
 
 // ── POST /api/requests/cart ────────────────────────────────────────────────
 // Submit a cart: multiple items from the same category in one request group
-router.post('/cart', (req, res) => {
-  const { requester_name, requester_email, type, unit_school, category, purpose, return_date, items } = req.body;
+router.post('/cart', uploadAttachment, (req, res) => {
+  const { requester_name, requester_email, type, unit_school, category, purpose, return_date } = req.body;
+
+  let items = req.body.items;
+  if (typeof items === 'string') {
+    try { items = JSON.parse(items); } catch { items = null; }
+  }
 
   if (!requester_name?.trim())  return res.status(400).json({ error: 'Requester name is required.' });
   if (!requester_email?.trim()) return res.status(400).json({ error: 'Requester email is required.' });
@@ -185,6 +233,8 @@ router.post('/cart', (req, res) => {
   if (!Array.isArray(items) || items.length === 0) return res.status(400).json({ error: 'Cart is empty.' });
 
   const group_id = `GRP-${Date.now()}-${String(Math.floor(Math.random() * 9999)).padStart(4, '0')}`;
+  const attachment_path = req.file ? req.file.filename     : null;
+  const attachment_name = req.file ? req.file.originalname : null;
 
   try {
     db.exec('BEGIN');
@@ -197,9 +247,9 @@ router.post('/cart', (req, res) => {
       if (item.quantity < quantity) throw Object.assign(new Error(`Not enough stock for "${item.name}" (${item.quantity} available).`), { status: 400 });
 
       db.prepare(`
-        INSERT INTO requests (item_id, requester_name, requester_email, type, quantity, unit_school, category, purpose, return_date, group_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(item_id, requester_name.trim(), requester_email.trim(), type, quantity, unit_school || 'All', category || null, purpose || null, return_date || null, group_id);
+        INSERT INTO requests (item_id, requester_name, requester_email, type, quantity, unit_school, category, purpose, return_date, group_id, attachment_path, attachment_name)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(item_id, requester_name.trim(), requester_email.trim(), type, quantity, unit_school || 'All', category || null, purpose || null, return_date || null, group_id, attachment_path, attachment_name);
     }
 
     db.exec('COMMIT');
@@ -267,8 +317,23 @@ router.post('/cart', (req, res) => {
     }
   } catch (err) {
     db.exec('ROLLBACK');
+    if (req.file) fs.unlink(req.file.path, () => {}); // don't leak an orphaned upload
     res.status(err.status || 500).json({ error: err.message });
   }
+});
+
+// ── GET /api/requests/attachment/:filename — download a request's proof file ──
+router.get('/attachment/:filename', (req, res) => {
+  const { filename } = req.params;
+  if (!/^[a-zA-Z0-9_.-]+$/.test(filename)) return res.status(400).json({ error: 'Invalid filename.' });
+
+  const filePath = path.join(UPLOAD_DIR, filename);
+  if (!filePath.startsWith(UPLOAD_DIR) || !fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Attachment not found.' });
+  }
+
+  const row = db.prepare('SELECT attachment_name FROM requests WHERE attachment_path = ?').get(filename);
+  res.download(filePath, row?.attachment_name || filename);
 });
 
 // ── POST /api/requests (single item — kept for backward compat) ───────────
@@ -475,6 +540,93 @@ router.put('/groups/:groupId/forward', (req, res) => {
     `${forwarded_note ? `\n\n📝 Note: ${forwarded_note}` : ''}\n\n` +
     `👉 Open app to review: tprainventory.ypj.sch.id/approvals`
   ).catch(() => {});
+});
+
+// ── PUT /api/requests/groups/:groupId/request-info ─────────────────────────
+// Storekeeper/Manager asks the requester for more justification (note and/or
+// an attachment) before the request can be reviewed. Status stays 'pending'.
+router.put('/groups/:groupId/request-info', (req, res) => {
+  const { note } = req.body || {};
+  const { groupId } = req.params;
+
+  if (!note?.trim()) return res.status(400).json({ error: 'Please describe what info is needed.' });
+
+  const rows = db.prepare(`${withItem} WHERE r.group_id = ? AND r.status = 'pending'`).all(groupId);
+  if (rows.length === 0) return res.status(404).json({ error: 'No pending items in this group.' });
+
+  db.prepare(`UPDATE requests SET needs_info = 1, info_request_note = ? WHERE group_id = ? AND status = 'pending'`)
+    .run(note.trim(), groupId);
+
+  res.json({ group_id: groupId, needs_info: rows.length });
+
+  const first = rows[0];
+  const itemsPayload = rows.map(r => ({ item_name: r.item_name, quantity: r.quantity, unit_name: r.unit_name }));
+  const itemsBullet  = rows.map(r => `• ${r.item_name} × ${r.quantity} ${r.unit_name}`).join('\n');
+
+  sendInfoRequested({
+    requesterName:  first.requester_name,
+    requesterEmail: first.requester_email,
+    items:          itemsPayload,
+    note:           note.trim(),
+    groupId,
+  }).catch(e => console.error('Info-requested email failed:', e.message));
+
+  const tgId = getTelegramId(first.requester_email);
+  if (tgId) sendTelegram(tgId,
+    `✏️ <b>More Info Needed</b>\n\n${itemsBullet}\n\n` +
+    `📝 ${note.trim()}\n\n` +
+    `👉 Open My Requests and tap Complete Request to add it.`
+  ).catch(() => {});
+});
+
+// ── PUT /api/requests/groups/:groupId/complete-info ─────────────────────────
+// Requester supplies the missing justification (note and/or attachment).
+router.put('/groups/:groupId/complete-info', uploadAttachment, (req, res) => {
+  const { groupId } = req.params;
+  const { purpose } = req.body || {};
+
+  const rows = db.prepare(`${withItem} WHERE r.group_id = ? AND r.status = 'pending'`).all(groupId);
+  if (rows.length === 0) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.status(404).json({ error: 'No pending items in this group.' });
+  }
+  if (!rows[0].needs_info) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    return res.status(400).json({ error: 'This request is not awaiting more info.' });
+  }
+  if (!purpose?.trim() && !req.file) {
+    return res.status(400).json({ error: 'Add a note or an attachment before submitting.' });
+  }
+
+  const oldAttachmentPath = rows[0].attachment_path;
+  const info_request_note = rows[0].info_request_note;
+
+  db.prepare(`
+    UPDATE requests
+    SET needs_info = 0,
+        purpose = COALESCE(?, purpose),
+        attachment_path = COALESCE(?, attachment_path),
+        attachment_name = COALESCE(?, attachment_name)
+    WHERE group_id = ? AND status = 'pending'
+  `).run(purpose?.trim() || null, req.file?.filename || null, req.file?.originalname || null, groupId);
+
+  // Replaced attachment — remove the old file from disk
+  if (req.file && oldAttachmentPath) fs.unlink(path.join(UPLOAD_DIR, oldAttachmentPath), () => {});
+
+  const updated = db.prepare(`${withItem} WHERE r.group_id = ? ORDER BY r.id`).all(groupId);
+  res.json({ group_id: groupId, updated: updated.length });
+
+  const first = updated[0];
+  const itemsPayload = updated.map(r => ({ item_name: r.item_name, quantity: r.quantity, unit_name: r.unit_name }));
+
+  sendRequestInfoProvided({
+    requesterName: first.requester_name,
+    requesterUnit: first.unit_school,
+    items:         itemsPayload,
+    note:          info_request_note,
+    groupId,
+    recipients:    getApproverRecipients(first.unit_school),
+  }).catch(e => console.error('Info-provided email failed:', e.message));
 });
 
 // ── PUT /api/requests/:id/forward (single) ────────────────────────────────

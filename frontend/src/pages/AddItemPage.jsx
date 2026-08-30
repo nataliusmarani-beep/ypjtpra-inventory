@@ -11,8 +11,8 @@ const CAT_BY_STORE = {
 };
 
 const EMPTY = {
-  name: '', code: '', icon: '',
-  category: 'Stationery', store_category: 'Supplies',
+  name: '', code: '', barcode: '', subtitle: '', icon: '',
+  category: 'Stationery', store_category: 'Supplies', item_type: 'used-up',
   location: 'SD SMP YPJ TPRA', unit_school: 'All',
   quantity: 0, max_quantity: 0, unit_name: 'pcs',
   min_threshold: 10, condition: 'Good', po_number: '', description: '',
@@ -43,7 +43,7 @@ export default function AddItemPage({ showToast, user }) {
   const [searchQuery,    setSearchQuery]    = useState('');
   const [searchResults,  setSearchResults]  = useState([]);
   const [searchLoading,  setSearchLoading]  = useState(false);
-  const [clonedFrom,     setClonedFrom]     = useState(null);
+  const [clonedFrom,     setClonedFrom]     = useState(null); // item cloned as template
   const searchTimer = useRef(null);
 
   useEffect(() => { api.getMeta().then(setMeta).catch(() => {}); }, []);
@@ -77,6 +77,7 @@ export default function AddItemPage({ showToast, user }) {
       icon:           item.icon           || '',
       category:       item.category       || 'Stationery',
       store_category: item.store_category || 'Supplies',
+      item_type:      item.item_type      || 'used-up',
       unit_name:      item.unit_name      || 'pcs',
       min_threshold:  item.min_threshold  ?? 10,
       condition:      item.condition      || 'Good',
@@ -106,17 +107,20 @@ export default function AddItemPage({ showToast, user }) {
 
     try {
       // ── Step 1: Check local inventory database first ──────────────────────
-      const localMatches = await api.getItems({ code: barcode });
+      const localMatches = await api.getItems({ barcode });
       if (localMatches.length > 0) {
         const item = localMatches[0];
         setExistingItem(item);
         // Pull ALL fields from existing item into the form
         setForm({
           name:           item.name           || '',
-          code:           item.code           || barcode,
+          code:           item.code           || '',
+          barcode:        item.barcode        || barcode,
+          subtitle:       item.subtitle        || '',
           icon:           item.icon           || '',
           category:       item.category       || 'Stationery',
           store_category: item.store_category || 'Supplies',
+          item_type:      item.item_type      || 'used-up',
           location:       item.location       || 'SD SMP YPJ TPRA',
           unit_school:    item.unit_school    || 'All',
           quantity:       item.quantity       ?? 0,
@@ -131,7 +135,7 @@ export default function AddItemPage({ showToast, user }) {
       }
 
       // ── Step 2: Not in local DB — try external product databases ──────────
-      setForm(f => ({ ...f, code: barcode }));
+      setForm(f => ({ ...f, barcode }));
       let name = '';
 
       // Source 1: UPC Item DB (broad product database)
@@ -238,12 +242,17 @@ export default function AddItemPage({ showToast, user }) {
                   style={{
                     padding: '10px 14px', cursor: 'pointer', background: '#fff',
                     borderBottom: '1px solid var(--border)', display: 'flex',
-                    alignItems: 'center', gap: 10, transition: 'background .1s',
+                    alignItems: 'center', gap: 10,
+                    transition: 'background .1s',
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = '#f0f4ff'}
                   onMouseLeave={e => e.currentTarget.style.background = '#fff'}
                 >
-                  <span style={{ fontSize: 20, flexShrink: 0 }}>{item.icon || '📦'}</span>
+                  <span style={{ fontSize: 20, flexShrink: 0, width: 24, textAlign: 'center' }}>
+                    {item.icon && item.icon.startsWith('data:image')
+                      ? <img src={item.icon} alt="" style={{ width: 22, height: 22, objectFit: 'contain', borderRadius: 3 }} />
+                      : (item.icon || '📦')}
+                  </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--navy)' }}>{item.name}</div>
                     <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>
@@ -274,7 +283,9 @@ export default function AddItemPage({ showToast, user }) {
             <div style={{ fontSize: 12, color: '#1d4ed8', fontWeight: 700, marginBottom: 2 }}>
               📋 Template applied from another location
             </div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--navy)' }}>{clonedFrom.name}</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--navy)' }}>
+              {clonedFrom.name}
+            </div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
               From: {clonedFrom.location} · Set your own quantity below, then save.
             </div>
@@ -356,14 +367,37 @@ export default function AddItemPage({ showToast, user }) {
               <input type="text" value={form.name} onChange={set('name')} placeholder="e.g. Whiteboard Marker" required />
             </div>
 
+            <div className="form-group full">
+              <label className="form-label">Subtitle</label>
+              <input
+                type="text"
+                value={form.subtitle}
+                onChange={set('subtitle')}
+                placeholder="e.g. Size M, Blue"
+              />
+              <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 3 }}>
+                Shown next to the barcode number, separated by "|" — use it for size, color, etc.
+              </div>
+            </div>
+
             <div className="form-group">
-              <label className="form-label">Item Code / Barcode</label>
+              <label className="form-label">Item Code</label>
+              <input
+                type="text"
+                value={form.code}
+                onChange={set('code')}
+                placeholder="e.g. STA-001"
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Barcode Number</label>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input
                   type="text"
-                  value={form.code}
-                  onChange={set('code')}
-                  placeholder="e.g. STA-001 or scan barcode"
+                  value={form.barcode}
+                  onChange={set('barcode')}
+                  placeholder="Scan or type the barcode"
                   style={{ flex: 1 }}
                 />
                 <button
@@ -389,6 +423,14 @@ export default function AddItemPage({ showToast, user }) {
               <label className="form-label">Category <span className="req">*</span></label>
               <select className="filter-select" value={form.category} onChange={set('category')} style={{ width: '100%' }}>
                 {(CAT_BY_STORE[form.store_category] || M.CATEGORIES || ['Stationery']).map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Type <span className="req">*</span></label>
+              <select className="filter-select" value={form.item_type} onChange={set('item_type')} style={{ width: '100%' }} required>
+                <option value="used-up">🗑️ Used-up (consumable)</option>
+                <option value="borrow">↩️ Borrow (must be returned)</option>
               </select>
             </div>
 
